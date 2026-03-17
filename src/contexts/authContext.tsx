@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useState, useEffect } from "react";
+import { createContext, PropsWithChildren, useState, useEffect, useMemo } from "react";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -13,12 +13,11 @@ const AUTH_STORAGE_KEY = "@auth-copy:auth-state";
 
 export const AuthContext = createContext<AuthState>({} as AuthState);
  
-const router = useRouter();
- 
 export function AuthProvider({children}: PropsWithChildren) {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isReady, setIsReady] = useState(false);
-    async function storageState( newState: {isLoggedIn: boolean}){
+    const router = useRouter();
+    async function saveStorageState( newState: {isLoggedIn: boolean}){
         try{
             await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newState));
         }
@@ -27,15 +26,15 @@ export function AuthProvider({children}: PropsWithChildren) {
         }
     }
 
-    function signIn(){
+    async function signIn(){
         setIsLoggedIn(true);
-        storageState({ isLoggedIn: true})
+       await saveStorageState({ isLoggedIn: true})
         router.push('/');
     }
 
-    function signOut(){
+    async function signOut(){
         setIsLoggedIn(false);
-        storageState({ isLoggedIn: false});
+       await saveStorageState({ isLoggedIn: false});
         router.replace('/signIn');
     }
 
@@ -46,11 +45,9 @@ export function AuthProvider({children}: PropsWithChildren) {
                 const state = storageState ? JSON.parse(storageState) : null;
                 setIsLoggedIn(state?.isLoggedIn ?? false);
                 console.log("STATE =>", state);
-
             }
             catch(error){
                 console.log("ERROR_GET_STORAGE_AUTH", error);
-                setIsReady(false);
             }
             finally {
                 setIsReady(true);
@@ -59,8 +56,15 @@ export function AuthProvider({children}: PropsWithChildren) {
         loadStorageState();
     }, []);
 
+    const value = useMemo(() => ({
+        isLoggedIn,
+        signIn,
+        signOut,
+        isReady,
+    }), [isReady, isLoggedIn]);
+
     return (
-        <AuthContext.Provider value={{ isLoggedIn, signIn, signOut, isReady}}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     )
